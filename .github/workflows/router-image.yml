@@ -1,0 +1,56 @@
+name: Build router image
+
+# Builds ghcr.io/onepush-dev/hyperswitch-router from router/ on top of the official
+# juspaydotin/hyperswitch-router:<version>-standalone image (digest-pinned in router/Dockerfile),
+# adding the matching upstream config + migrations from the release tag.
+on:
+  push:
+    branches: [main]
+    paths: ["router/**", ".github/workflows/router-image.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  HYPERSWITCH_VERSION: v1.128.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch upstream config and migrations (${{ env.HYPERSWITCH_VERSION }})
+        run: |
+          git clone --depth 1 --branch "$HYPERSWITCH_VERSION" --filter=blob:none --sparse https://github.com/juspay/hyperswitch /tmp/hs
+          git -C /tmp/hs sparse-checkout set migrations config
+          mkdir -p router/upstream/config
+          cp -r /tmp/hs/migrations router/upstream/migrations
+          cp /tmp/hs/config/docker_compose.toml /tmp/hs/config/superposition_seed.toml router/upstream/config/
+          echo "upstream commit: $(git -C /tmp/hs rev-parse HEAD)"
+          ls router/upstream/migrations | wc -l
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Short SHA
+        id: vars
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: router
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/hyperswitch-router:${{ env.HYPERSWITCH_VERSION }}
+            ghcr.io/${{ github.repository_owner }}/hyperswitch-router:${{ env.HYPERSWITCH_VERSION }}-${{ steps.vars.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.HYPERSWITCH_VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.description=Hyperswitch router ${{ env.HYPERSWITCH_VERSION }} with auto-migrations for Railway
+            org.opencontainers.image.licenses=Apache-2.0
