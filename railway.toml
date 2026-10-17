@@ -1,0 +1,15 @@
+# Reference only. This repo is a multi-service Railway template; every service deploys a Docker image:
+#   hyperswitch-router  image ghcr.io/onepush-dev/hyperswitch-router:v1.128.0@sha256:71110fad0a471321fc2b1f3794f40f08235b441e64cae4c01dea4904b38fcae4
+#                       (built by .github/workflows/router-image.yml from router/), port 8080, health /health,
+#                       volume /local/bin/files, public. Image ENTRYPOINT runs migrations, then the router.
+#   control-center      image docker.io/juspaydotin/hyperswitch-control-center:v1.38.10@sha256:be7c128fb0e92a22d576c8ec15a8dffda047ceb5242ca1b4d48dc73d20498366
+#                       port 9000, health /health, public.
+#   Postgres            ghcr.io/railwayapp-templates/postgres-ssl:18@sha256:fcc6686a3f4f1962fe4ed77a15884553b7bd611ae1cea3204687968c5c09d517, volume /var/lib/postgresql/data
+#   Redis               redis:8.2.10@sha256:47670742d7924adbcdb404d1288b6327815b23141969c0939b8e5d61f78c2634, volume /data
+# The marketplace template is generated from the live Railway project in the dashboard.
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 600
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
